@@ -1,0 +1,216 @@
+#include <iostream>
+#include <SDL2/SDL.h>
+#include <vector>
+#include <string>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+SDL_Renderer *renderer;
+SDL_Window *window;
+SDL_Event event;
+
+
+struct CharSpriteMap
+{
+    char c;
+    unsigned int sprite_sheet_row; // this assumes each row only contains 1 letter animation.
+};
+
+struct SpriteSheet
+{
+    SDL_Texture *texture;
+    size_t n_rows;
+    size_t n_cols;
+    size_t cell_size;
+};
+
+
+struct AnimatedFontSprite
+{
+    std::vector<CharSpriteMap> char_sprite_maps;
+    float seconds_per_frame;
+    float accumulator;
+    unsigned int curr_frame;
+    SpriteSheet sprite_sheet;
+    std::string text;
+
+    unsigned int n_frames()
+    {
+        return sprite_sheet.n_cols;
+    }
+
+    void increment(float delta_time_seconds)
+    {
+        accumulator += delta_time_seconds;
+        if(accumulator >= seconds_per_frame)
+        {
+            accumulator = 0.0f;
+            curr_frame++;
+        }
+        if(curr_frame >= n_frames())
+        {
+            curr_frame = 0;
+        }
+    }
+};
+
+
+void AnimatedFontSprite_increment(AnimatedFontSprite &animated_font_sprite, float delta_time_seconds)
+{
+    animated_font_sprite.accumulator += delta_time_seconds;
+    if(animated_font_sprite.accumulator >= animated_font_sprite.seconds_per_frame)
+    {
+        animated_font_sprite.accumulator = 0.0f;
+        animated_font_sprite.curr_frame++;
+    }
+    if(animated_font_sprite.curr_frame >= animated_font_sprite.n_frames())
+    {
+        animated_font_sprite.curr_frame = 0;
+    }
+}
+
+SDL_Rect AnimatedFontSprite_generate_src_rect_for_char(char c, AnimatedFontSprite font_sprite)
+{
+    bool found = false;
+    unsigned int sprite_sheet_row;
+    SDL_Rect src_rect;
+
+    for(CharSpriteMap char_sprite_map : font_sprite.char_sprite_maps)
+    {
+        if (toupper(c) == toupper(char_sprite_map.c))
+        {
+            found = true;
+            sprite_sheet_row = char_sprite_map.sprite_sheet_row;
+            break;
+        }
+    }
+
+    const unsigned int not_found_char_row = 3;
+
+    if(found)
+    {
+        src_rect.x = font_sprite.sprite_sheet.cell_size * font_sprite.curr_frame;
+        src_rect.y = font_sprite.sprite_sheet.cell_size * sprite_sheet_row;
+        src_rect.w = src_rect.h = font_sprite.sprite_sheet.cell_size;
+    }
+    else
+    {
+        src_rect.x = font_sprite.sprite_sheet.cell_size * font_sprite.curr_frame;
+        src_rect.y = font_sprite.sprite_sheet.cell_size * not_found_char_row;
+        src_rect.w = src_rect.h = font_sprite.sprite_sheet.cell_size;
+    }
+
+    return src_rect;
+}
+
+
+void AnimatedFontSprite_render(int posx, int posy, AnimatedFontSprite animated_font_sprite)
+{
+    for(int i = 0; i < animated_font_sprite.text.size(); i++)
+    {
+        char c = animated_font_sprite.text[i];
+        int renderx = posx + (i * animated_font_sprite.sprite_sheet.cell_size);
+        int rendery = posy;
+
+        SDL_Rect src_rect = AnimatedFontSprite_generate_src_rect_for_char(c, animated_font_sprite);
+        SDL_Rect dest_rect = {
+                renderx,
+                rendery,
+                (int)animated_font_sprite.sprite_sheet.cell_size,
+                (int)animated_font_sprite.sprite_sheet.cell_size
+        };
+
+        SDL_RenderCopy(renderer, animated_font_sprite.sprite_sheet.texture, &src_rect, &dest_rect);
+    }
+}
+
+
+SpriteSheet SpriteSheet_init(const std::string &filename, unsigned int n_rows, unsigned int n_cols, unsigned int cell_size)
+{
+    int req_format = STBI_rgb_alpha;
+    int image_w, image_h, image_channels;
+    unsigned char *image_data = stbi_load(filename.c_str(), &image_w, &image_h, &image_channels, req_format);
+
+
+    int depth, pitch;
+    SDL_Surface* image_surface;
+    Uint32 pixel_format;
+
+    depth = 32;
+    pitch = 4 * image_w;
+    pixel_format = SDL_PIXELFORMAT_RGBA32;
+
+    image_surface = SDL_CreateRGBSurfaceWithFormatFrom(image_data, image_w, image_h, depth, pitch, pixel_format);
+
+    SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, image_surface);
+
+    if(texture == NULL)
+    {
+        fprintf(stderr,"%s\n", SDL_GetError());
+    }
+
+    SDL_FreeSurface(image_surface);
+    stbi_image_free(image_data);
+
+    SpriteSheet sprite_sheet;
+    sprite_sheet.texture = texture;
+    sprite_sheet.n_rows = n_rows;
+    sprite_sheet.n_cols = n_cols;
+    sprite_sheet.cell_size = cell_size;
+
+    return sprite_sheet;
+}
+
+
+int main()
+{
+    SDL_Init(SDL_INIT_VIDEO);
+    window = SDL_CreateWindow("title", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1440,1440, 0);
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+
+    AnimatedFontSprite animated_font_sprite;
+    animated_font_sprite.sprite_sheet = SpriteSheet_init("fontSpriteSheet.png", 4, 4, 200);
+    animated_font_sprite.curr_frame = 0;
+    animated_font_sprite.accumulator = 0.0f;
+    animated_font_sprite.seconds_per_frame = 0.1;
+    animated_font_sprite.text = "!!!BBAAM";
+    animated_font_sprite.char_sprite_maps.push_back((CharSpriteMap){'A', 0});
+    animated_font_sprite.char_sprite_maps.push_back((CharSpriteMap){'B', 1});
+    animated_font_sprite.char_sprite_maps.push_back((CharSpriteMap){'C', 2});
+
+
+
+
+    double delta_time_in_sec = 0.0f;
+    double frame_start_seconds = 0.0f;
+    double frame_end_seconds = 0.0f;
+
+
+    bool quit = false;
+    while(!quit)
+    {
+        delta_time_in_sec = frame_end_seconds - frame_start_seconds;
+        frame_start_seconds = (double)SDL_GetTicks()/1000.0f;
+        while(SDL_PollEvent(&event))
+        {
+            if(event.type == SDL_QUIT)
+            {
+                quit = true;
+            }
+        }
+
+        animated_font_sprite.increment(delta_time_in_sec);
+        SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);
+        SDL_RenderClear(renderer);
+
+        AnimatedFontSprite_render(200, 200, animated_font_sprite);
+
+        SDL_RenderPresent(renderer);
+
+        frame_end_seconds = (double)SDL_GetTicks()/1000.0f;
+    }
+
+
+    std::cout << "Hello, World!" << std::endl;
+    return 0;
+}
