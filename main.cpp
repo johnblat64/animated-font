@@ -28,6 +28,8 @@ struct SpriteSheet
 struct AnimatedFontSprite
 {
     std::vector<CharSpriteMap> char_sprite_maps;
+
+    unsigned int char_pixel_width;
     float seconds_per_frame;
     float accumulator;
     unsigned int curr_frame;
@@ -109,15 +111,15 @@ void AnimatedFontSprite_render(int posx, int posy, AnimatedFontSprite animated_f
     for(int i = 0; i < animated_font_sprite.text.size(); i++)
     {
         char c = animated_font_sprite.text[i];
-        int renderx = posx + (i * animated_font_sprite.sprite_sheet.cell_size);
+        int renderx = posx + (i * animated_font_sprite.char_pixel_width);
         int rendery = posy;
 
         SDL_Rect src_rect = AnimatedFontSprite_generate_src_rect_for_char(c, animated_font_sprite);
         SDL_Rect dest_rect = {
                 renderx,
                 rendery,
-                (int)animated_font_sprite.sprite_sheet.cell_size,
-                (int)animated_font_sprite.sprite_sheet.cell_size
+                (int)animated_font_sprite.char_pixel_width,
+                (int)animated_font_sprite.char_pixel_width
         };
 
         SDL_RenderCopy(renderer, animated_font_sprite.sprite_sheet.texture, &src_rect, &dest_rect);
@@ -174,6 +176,7 @@ int main()
     animated_font_sprite.accumulator = 0.0f;
     animated_font_sprite.seconds_per_frame = 0.1;
     animated_font_sprite.text = "hey there";
+    animated_font_sprite.char_pixel_width = 100;
     for(char i = 0; i <= 26; i++)
     {
         char c = 'A' + i;
