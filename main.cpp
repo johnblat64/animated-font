@@ -2,8 +2,15 @@
 #include <SDL2/SDL.h>
 #include <vector>
 #include <string>
+
 #define STB_IMAGE_IMPLEMENTATION
+
 #include "stb_image.h"
+#include "external/imgui/imgui.h"
+#include "external/imgui/backends/imgui_impl_sdl.h"
+#include "external/imgui/backends/imgui_impl_sdlrenderer.h"
+#include "external/imgui/misc/cpp/imgui_stdlib.h"
+
 
 SDL_Renderer *renderer;
 SDL_Window *window;
@@ -35,6 +42,7 @@ struct AnimatedFontSprite
     unsigned int curr_frame;
     SpriteSheet sprite_sheet;
     std::vector<std::string> lines;
+    int color_mod[3];
 
     unsigned int n_frames()
     {
@@ -44,12 +52,12 @@ struct AnimatedFontSprite
     void increment(float delta_time_seconds)
     {
         accumulator += delta_time_seconds;
-        if(accumulator >= seconds_per_frame)
+        if (accumulator >= seconds_per_frame)
         {
             accumulator = 0.0f;
             curr_frame++;
         }
-        if(curr_frame >= n_frames())
+        if (curr_frame >= n_frames())
         {
             curr_frame = 0;
         }
@@ -60,12 +68,12 @@ struct AnimatedFontSprite
 void AnimatedFontSprite_increment(AnimatedFontSprite &animated_font_sprite, float delta_time_seconds)
 {
     animated_font_sprite.accumulator += delta_time_seconds;
-    if(animated_font_sprite.accumulator >= animated_font_sprite.seconds_per_frame)
+    if (animated_font_sprite.accumulator >= animated_font_sprite.seconds_per_frame)
     {
         animated_font_sprite.accumulator = 0.0f;
         animated_font_sprite.curr_frame++;
     }
-    if(animated_font_sprite.curr_frame >= animated_font_sprite.n_frames())
+    if (animated_font_sprite.curr_frame >= animated_font_sprite.n_frames())
     {
         animated_font_sprite.curr_frame = 0;
     }
@@ -77,7 +85,7 @@ SDL_Rect AnimatedFontSprite_generate_src_rect_for_char(char c, AnimatedFontSprit
     unsigned int sprite_sheet_row;
     SDL_Rect src_rect;
 
-    for(CharSpriteMap char_sprite_map : font_sprite.char_sprite_maps)
+    for (CharSpriteMap char_sprite_map: font_sprite.char_sprite_maps)
     {
         if (toupper(c) == toupper(char_sprite_map.c))
         {
@@ -89,7 +97,7 @@ SDL_Rect AnimatedFontSprite_generate_src_rect_for_char(char c, AnimatedFontSprit
 
     const unsigned int not_found_char_row = 3;
 
-    if(found)
+    if (found)
     {
         src_rect.x = font_sprite.sprite_sheet.cell_size * font_sprite.curr_frame;
         src_rect.y = font_sprite.sprite_sheet.cell_size * sprite_sheet_row;
@@ -108,12 +116,15 @@ SDL_Rect AnimatedFontSprite_generate_src_rect_for_char(char c, AnimatedFontSprit
 
 void AnimatedFontSprite_render(int posx, int posy, AnimatedFontSprite animated_font_sprite)
 {
-    for(int l = 0; l < animated_font_sprite.lines.size(); l++)
+    SDL_SetTextureColorMod(animated_font_sprite.sprite_sheet.texture, animated_font_sprite.color_mod[0],
+                           animated_font_sprite.color_mod[1], animated_font_sprite.color_mod[2]);
+
+    for (int l = 0; l < animated_font_sprite.lines.size(); l++)
     {
         int rendery = posy + (l * animated_font_sprite.char_pixel_width);
         std::string line = animated_font_sprite.lines[l];
 
-        for(int i = 0; i < line.size(); i++)
+        for (int i = 0; i < line.size(); i++)
         {
             char c = line[i];
             int renderx = posx + (i * animated_font_sprite.char_pixel_width);
@@ -122,8 +133,8 @@ void AnimatedFontSprite_render(int posx, int posy, AnimatedFontSprite animated_f
             SDL_Rect dest_rect = {
                     renderx,
                     rendery,
-                    (int)animated_font_sprite.char_pixel_width,
-                    (int)animated_font_sprite.char_pixel_width
+                    (int) animated_font_sprite.char_pixel_width,
+                    (int) animated_font_sprite.char_pixel_width
             };
 
             SDL_RenderCopy(renderer, animated_font_sprite.sprite_sheet.texture, &src_rect, &dest_rect);
@@ -133,7 +144,8 @@ void AnimatedFontSprite_render(int posx, int posy, AnimatedFontSprite animated_f
 }
 
 
-SpriteSheet SpriteSheet_init(const std::string &filename, unsigned int n_rows, unsigned int n_cols, unsigned int cell_size)
+SpriteSheet
+SpriteSheet_init(const std::string &filename, unsigned int n_rows, unsigned int n_cols, unsigned int cell_size)
 {
     int req_format = STBI_rgb_alpha;
     int image_w, image_h, image_channels;
@@ -141,7 +153,7 @@ SpriteSheet SpriteSheet_init(const std::string &filename, unsigned int n_rows, u
 
 
     int depth, pitch;
-    SDL_Surface* image_surface;
+    SDL_Surface *image_surface;
     Uint32 pixel_format;
 
     depth = 32;
@@ -151,10 +163,10 @@ SpriteSheet SpriteSheet_init(const std::string &filename, unsigned int n_rows, u
     image_surface = SDL_CreateRGBSurfaceWithFormatFrom(image_data, image_w, image_h, depth, pitch, pixel_format);
 
     SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, image_surface);
-
-    if(texture == NULL)
+//    SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_MOD);
+    if (texture == NULL)
     {
-        fprintf(stderr,"%s\n", SDL_GetError());
+        fprintf(stderr, "%s\n", SDL_GetError());
     }
 
     SDL_FreeSurface(image_surface);
@@ -173,8 +185,18 @@ SpriteSheet SpriteSheet_init(const std::string &filename, unsigned int n_rows, u
 int main()
 {
     SDL_Init(SDL_INIT_VIDEO);
-    window = SDL_CreateWindow("title", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1440,1440, 0);
+    window = SDL_CreateWindow("title", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1440, 1440, 0);
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+
+    // IMGUI Setup
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    (void) io;
+
+    ImGui::StyleColorsDark();
+
+    ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
+    ImGui_ImplSDLRenderer_Init(renderer);
 
     AnimatedFontSprite animated_font_sprite;
     animated_font_sprite.sprite_sheet = SpriteSheet_init("fontSpriteSheet.png", 4, 4, 200);
@@ -183,15 +205,17 @@ int main()
     animated_font_sprite.seconds_per_frame = 0.1;
     animated_font_sprite.lines.push_back("LORD MAZE");
     animated_font_sprite.lines.push_back("RULER OF MAZES");
+    animated_font_sprite.color_mod[0] = 255;
+    animated_font_sprite.color_mod[1] = 255;animated_font_sprite.color_mod[2] = 255;
     animated_font_sprite.char_pixel_width = 100;
-    for(char i = 0; i <= 26; i++)
+    for (char i = 0; i <= 26; i++)
     {
         char c = 'A' + i;
         unsigned int row = i;
-        animated_font_sprite.char_sprite_maps.push_back((CharSpriteMap){c, row});
+        animated_font_sprite.char_sprite_maps.push_back((CharSpriteMap) {c, row});
 
     }
-    animated_font_sprite.char_sprite_maps.push_back((CharSpriteMap){' ', 27});
+    animated_font_sprite.char_sprite_maps.push_back((CharSpriteMap) {' ', 27});
 
 
     double delta_time_in_sec = 0.0f;
@@ -200,17 +224,46 @@ int main()
 
 
     bool quit = false;
-    while(!quit)
+    while (!quit)
     {
         delta_time_in_sec = frame_end_seconds - frame_start_seconds;
-        frame_start_seconds = (double)SDL_GetTicks()/1000.0f;
-        while(SDL_PollEvent(&event))
+        frame_start_seconds = (double) SDL_GetTicks() / 1000.0f;
+        while (SDL_PollEvent(&event))
         {
-            if(event.type == SDL_QUIT)
+            ImGui_ImplSDL2_ProcessEvent(&event);
+
+            if (event.type == SDL_QUIT)
             {
                 quit = true;
             }
         }
+
+        ImGui_ImplSDLRenderer_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
+        ImGui::NewFrame();
+
+        if (ImGui::Begin("Animated Font Sprite"))
+        {
+            ImGui::SliderInt("R", (int *) &animated_font_sprite.color_mod[0], 0, 255);
+            ImGui::SliderInt("G", (int *) &animated_font_sprite.color_mod[1],  0, 255);
+            ImGui::SliderInt("B", (int *) &animated_font_sprite.color_mod[2], 0, 255 );
+
+//            ImGui::InputInt("G", (int *) &animated_font_sprite.color_mod.g);
+//            ImGui::InputInt("B", (int *) &animated_font_sprite.color_mod.b);
+
+            //            // add line
+            if(ImGui::Button("Add Line"))
+            {
+                animated_font_sprite.lines.push_back("");
+            }
+            for(int i = 0; i < animated_font_sprite.lines.size(); i++)
+            {
+                char label[4];
+                sprintf(label, "%d", i);
+                ImGui::InputText(label, &animated_font_sprite.lines[i]);
+            }
+        }
+        ImGui::End();
 
         animated_font_sprite.increment(delta_time_in_sec);
         SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);
@@ -218,9 +271,12 @@ int main()
 
         AnimatedFontSprite_render(10, 10, animated_font_sprite);
 
+
+        ImGui::Render();
+        ImGui_ImplSDLRenderer_RenderDrawData(ImGui::GetDrawData());
         SDL_RenderPresent(renderer);
 
-        frame_end_seconds = (double)SDL_GetTicks()/1000.0f;
+        frame_end_seconds = (double) SDL_GetTicks() / 1000.0f;
     }
 
 
