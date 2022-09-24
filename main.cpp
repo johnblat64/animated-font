@@ -173,12 +173,15 @@ int main()
     animated_font_sprite.curr_frame = 0;
     animated_font_sprite.accumulator = 0.0f;
     animated_font_sprite.seconds_per_frame = 0.1;
-    animated_font_sprite.text = "!!!BBAAM";
-    animated_font_sprite.char_sprite_maps.push_back((CharSpriteMap){'A', 0});
-    animated_font_sprite.char_sprite_maps.push_back((CharSpriteMap){'B', 1});
-    animated_font_sprite.char_sprite_maps.push_back((CharSpriteMap){'C', 2});
+    animated_font_sprite.text = "hey there";
+    for(char i = 0; i <= 26; i++)
+    {
+        char c = 'A' + i;
+        unsigned int row = i;
+        animated_font_sprite.char_sprite_maps.push_back((CharSpriteMap){c, row});
 
-
+    }
+    animated_font_sprite.char_sprite_maps.push_back((CharSpriteMap){' ', 27});
 
 
     double delta_time_in_sec = 0.0f;
@@ -203,7 +206,7 @@ int main()
         SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);
         SDL_RenderClear(renderer);
 
-        AnimatedFontSprite_render(200, 200, animated_font_sprite);
+        AnimatedFontSprite_render(10, 10, animated_font_sprite);
 
         SDL_RenderPresent(renderer);
 
