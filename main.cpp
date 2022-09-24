@@ -34,7 +34,7 @@ struct AnimatedFontSprite
     float accumulator;
     unsigned int curr_frame;
     SpriteSheet sprite_sheet;
-    std::string text;
+    std::vector<std::string> lines;
 
     unsigned int n_frames()
     {
@@ -108,22 +108,28 @@ SDL_Rect AnimatedFontSprite_generate_src_rect_for_char(char c, AnimatedFontSprit
 
 void AnimatedFontSprite_render(int posx, int posy, AnimatedFontSprite animated_font_sprite)
 {
-    for(int i = 0; i < animated_font_sprite.text.size(); i++)
+    for(int l = 0; l < animated_font_sprite.lines.size(); l++)
     {
-        char c = animated_font_sprite.text[i];
-        int renderx = posx + (i * animated_font_sprite.char_pixel_width);
-        int rendery = posy;
+        int rendery = posy + (l * animated_font_sprite.char_pixel_width);
+        std::string line = animated_font_sprite.lines[l];
 
-        SDL_Rect src_rect = AnimatedFontSprite_generate_src_rect_for_char(c, animated_font_sprite);
-        SDL_Rect dest_rect = {
-                renderx,
-                rendery,
-                (int)animated_font_sprite.char_pixel_width,
-                (int)animated_font_sprite.char_pixel_width
-        };
+        for(int i = 0; i < line.size(); i++)
+        {
+            char c = line[i];
+            int renderx = posx + (i * animated_font_sprite.char_pixel_width);
 
-        SDL_RenderCopy(renderer, animated_font_sprite.sprite_sheet.texture, &src_rect, &dest_rect);
+            SDL_Rect src_rect = AnimatedFontSprite_generate_src_rect_for_char(c, animated_font_sprite);
+            SDL_Rect dest_rect = {
+                    renderx,
+                    rendery,
+                    (int)animated_font_sprite.char_pixel_width,
+                    (int)animated_font_sprite.char_pixel_width
+            };
+
+            SDL_RenderCopy(renderer, animated_font_sprite.sprite_sheet.texture, &src_rect, &dest_rect);
+        }
     }
+
 }
 
 
@@ -175,7 +181,8 @@ int main()
     animated_font_sprite.curr_frame = 0;
     animated_font_sprite.accumulator = 0.0f;
     animated_font_sprite.seconds_per_frame = 0.1;
-    animated_font_sprite.text = "hey there";
+    animated_font_sprite.lines.push_back("LORD MAZE");
+    animated_font_sprite.lines.push_back("RULER OF MAZES");
     animated_font_sprite.char_pixel_width = 100;
     for(char i = 0; i <= 26; i++)
     {
