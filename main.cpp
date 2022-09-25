@@ -124,7 +124,6 @@ void AnimatedFontSprite_render(int posx, int posy, AnimatedFontSprite animated_f
 
     for (char c : animated_font_sprite.text)
     {
-//        char c = animated_font_sprite.text[i];
         if(c == '\n')
         {
             col = 0;
