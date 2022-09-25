@@ -41,7 +41,7 @@ struct AnimatedFontSprite
     float accumulator;
     unsigned int curr_frame;
     SpriteSheet sprite_sheet;
-    std::vector<std::string> lines;
+    std::string text;
     int color_mod[3];
 
     unsigned int n_frames()
@@ -119,26 +119,32 @@ void AnimatedFontSprite_render(int posx, int posy, AnimatedFontSprite animated_f
     SDL_SetTextureColorMod(animated_font_sprite.sprite_sheet.texture, animated_font_sprite.color_mod[0],
                            animated_font_sprite.color_mod[1], animated_font_sprite.color_mod[2]);
 
-    for (int l = 0; l < animated_font_sprite.lines.size(); l++)
+    int row = 0;
+    int col = 0;
+
+    for (char c : animated_font_sprite.text)
     {
-        int rendery = posy + (l * animated_font_sprite.char_pixel_width);
-        std::string line = animated_font_sprite.lines[l];
-
-        for (int i = 0; i < line.size(); i++)
+//        char c = animated_font_sprite.text[i];
+        if(c == '\n')
         {
-            char c = line[i];
-            int renderx = posx + (i * animated_font_sprite.char_pixel_width);
-
-            SDL_Rect src_rect = AnimatedFontSprite_generate_src_rect_for_char(c, animated_font_sprite);
-            SDL_Rect dest_rect = {
-                    renderx,
-                    rendery,
-                    (int) animated_font_sprite.char_pixel_width,
-                    (int) animated_font_sprite.char_pixel_width
-            };
-
-            SDL_RenderCopy(renderer, animated_font_sprite.sprite_sheet.texture, &src_rect, &dest_rect);
+            col = 0;
+            row++;
+            continue;
         }
+
+        int renderx = posx + (col * animated_font_sprite.char_pixel_width);
+        int rendery = posy + (row * animated_font_sprite.char_pixel_width);
+
+        SDL_Rect src_rect = AnimatedFontSprite_generate_src_rect_for_char(c, animated_font_sprite);
+        SDL_Rect dest_rect = {
+                renderx,
+                rendery,
+                (int) animated_font_sprite.char_pixel_width,
+                (int) animated_font_sprite.char_pixel_width
+        };
+
+        SDL_RenderCopy(renderer, animated_font_sprite.sprite_sheet.texture, &src_rect, &dest_rect);
+        col++;
     }
 
 }
@@ -203,8 +209,7 @@ int main()
     animated_font_sprite.curr_frame = 0;
     animated_font_sprite.accumulator = 0.0f;
     animated_font_sprite.seconds_per_frame = 0.1;
-    animated_font_sprite.lines.push_back("LORD MAZE");
-    animated_font_sprite.lines.push_back("RULER OF MAZES");
+    animated_font_sprite.text = "LORD MAZE\nRULER OF MAZES";
     animated_font_sprite.color_mod[0] = 255;
     animated_font_sprite.color_mod[1] = 255;animated_font_sprite.color_mod[2] = 255;
     animated_font_sprite.char_pixel_width = 100;
@@ -252,16 +257,9 @@ int main()
 //            ImGui::InputInt("B", (int *) &animated_font_sprite.color_mod.b);
 
             //            // add line
-            if(ImGui::Button("Add Line"))
-            {
-                animated_font_sprite.lines.push_back("");
-            }
-            for(int i = 0; i < animated_font_sprite.lines.size(); i++)
-            {
-                char label[4];
-                sprintf(label, "%d", i);
-                ImGui::InputText(label, &animated_font_sprite.lines[i]);
-            }
+
+            ImGui::InputTextMultiline("text", &animated_font_sprite.text);
+
         }
         ImGui::End();
 
